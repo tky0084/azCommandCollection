@@ -1,0 +1,54 @@
+######スケジュールに関する変数の定義######
+# スケジュール名（固定）
+$ScheduleName = "schedule-hub-$MgNameShort-diagAuditPolicy-01"
+
+# Runbookの実行時刻（日本時間）
+$ScheduleHour = 9
+$ScheduleMinute = 0
+
+# スケジュールのタイムゾーン
+$TimeZone = "Asia/Tokyo"
+
+#=====================
+#⑪ Runbookの実行スケジュールの作成
+#=====================
+
+# 日本時間の現在日時を取得
+$NowJst = [DateTimeOffset]::UtcNow.ToOffset(
+    [TimeSpan]::FromHours(9)
+)
+
+# 当日の9:00を設定
+$StartTime = [DateTimeOffset]::new(
+    $NowJst.Year,
+    $NowJst.Month,
+    $NowJst.Day,
+    $ScheduleHour,
+    $ScheduleMinute,
+    0,
+    [TimeSpan]::FromHours(9)
+)
+
+# 実行予定時刻まで5分以内の場合は翌日に設定
+if ($StartTime -le $NowJst.AddMinutes(5)) {
+    $StartTime = $StartTime.AddDays(1)
+}
+
+# スケジュールの作成
+New-AzAutomationSchedule `
+    -ResourceGroupName $RG `
+    -AutomationAccountName $AutomationName `
+    -Name $ScheduleName `
+    -Description "監査用Runbookを毎日9:00に実行" `
+    -StartTime $StartTime `
+    -DayInterval 1 `
+    -TimeZone $TimeZone
+
+# スケジュールとRunbookの紐付け
+Register-AzAutomationScheduledRunbook `
+    -ResourceGroupName $RG `
+    -AutomationAccountName $AutomationName `
+    -RunbookName $RunbookNameAudit `
+    -ScheduleName $ScheduleName
+
+Write-Host "Runbook Schedule created."
